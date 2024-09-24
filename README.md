@@ -2,7 +2,7 @@
 
 [[ECCV 2024](https://eccv2024.ecva.net/)] [[Paper](https://arxiv.org/abs/2403.18388)] [[Poster](./docs/ECCV_2024_poster.pdf)]
 
-This repository contains our implementation of FTBC, along with several baseline methods related to ANN-SNN conversion. Below is an overview of the project structure.
+This repository contains our implementation of FTBC, along with several baseline methods related to ANN-SNN conversion. Below is an overview of our proposed method.
 
 <p align="center">
     <img src="docs/figs/overview.png" alt="Project Overview" width="500"/>
