@@ -1,0 +1,1 @@
+python main_train.py --model resnet20 --epochs=300 -dev=0 -L=4 -data=cifar10
