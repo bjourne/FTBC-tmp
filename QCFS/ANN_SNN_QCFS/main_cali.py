@@ -1,4 +1,3 @@
-import argparse
 import os
 import copy
 import random
@@ -81,15 +80,14 @@ def bias_corr_step_by_step(
         mem_t_updated = mem_t - bias
 
         spike_updated = module_snn.act(mem_t_updated - thre, module_snn.gama) * thre
-        v_t_updated = mem_t_updated - spike_updated
+        v_t_1 = mem_t_updated - spike_updated
 
         if len(bias.shape) == 4:
             bias_mean = bias.mean(dim=[0, 2, 3])
         elif len(bias.shape) == 2:
             bias_mean = bias.mean(dim=0)
 
-        module_snn.time_based_bias[t] = curr_t_alpha * bias_mean + module_snn.time_based_bias[t]
-        v_t_1 = v_t_updated
+        module_snn.time_based_bias[t] += curr_t_alpha * bias_mean
 
 
 def bias_corr_model(
@@ -113,25 +111,30 @@ def bias_corr_model(
         if i >= num_cali_sample_batches:
             break
 
-        sys.stdout.flush()
         xs = xs.to(device=device)
         for (name_ann, module_ann), (name_snn, module_snn) in zip(ann_mods, snn_mods):
             assert name_ann == name_snn
             if isinstance(module_snn, IF):
-                #--------------------------------------------------------------------------------------------#
                 ### our method: time-based bias cali: go to class IF in qcfs_models/layer.py
                 bias_corr_step_by_step(
                     ann, module_ann, snn, module_snn, T, xs, curr_t_alpha=curr_t_alpha)
-                #--------------------------------------------------------------------------------------------#
 
 
 def main():
     parser = ArgumentParser(description='PyTorch Training')
     # just use default setting
-    parser.add_argument('-j','--workers',default=16, type=int,metavar='N',help='number of data loading workers')
-    parser.add_argument('-b','--batch_size',default=200, type=int,metavar='N',help='mini-batch size')
-    parser.add_argument('--seed',default=42,type=int,help='seed for initializing training. ')
-    parser.add_argument('-suffix','--suffix',default='', type=str,help='suffix')
+    parser.add_argument(
+        '-j','--workers',default=16, type=int,metavar='N',help='number of data loading workers'
+    )
+    parser.add_argument(
+        '-b','--batch_size',default=200, type=int,metavar='N',help='mini-batch size'
+    )
+    parser.add_argument(
+        '--seed',default=42,type=int,help='seed for initializing training. '
+    )
+    parser.add_argument(
+        '-suffix','--suffix',default='', type=str,help='suffix'
+    )
 
     # model configuration
     parser.add_argument('-data', '--dataset',default='cifar100',type=str,help='dataset: cifa10, cifar100, imagenet')
@@ -151,7 +154,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # preparing data
-    l_tr, test_loader = datapool(args.dataset, args.batch_size, dist_sample=False)
+    l_tr, l_te = datapool(args.dataset, args.batch_size, dist_sample=False)
 
     # preparing model
     model = modelpool(args.model, args.dataset)
@@ -182,7 +185,7 @@ def main():
     #         print(m.thresh)
 
     ### get QCFS SNN model accuracy:
-    # snn_acc = val(model, test_loader, T=args.time, device=device)
+    # snn_acc = val(model, l_te, T=args.time, device=device)
     # print(f"SNN accuracy: {snn_acc}, T: {args.time}, L: {args.L}")
 
     #--------------------------------------------------------------------------#
@@ -197,7 +200,7 @@ def main():
         num_cali_sample_batches=3,
     )
 
-    cali_snn_acc = val(model, test_loader, T=args.time, device=device)
+    cali_snn_acc = val(model, l_te, T=args.time, device=device)
     print(f"Calibrated SNN accuracy: {cali_snn_acc}, T: {args.time}, L: {args.L}")
 
 

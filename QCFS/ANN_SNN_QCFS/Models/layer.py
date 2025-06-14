@@ -1,9 +1,10 @@
 # from cv2 import mean
+from torch.nn import Module
 from sympy import print_rcode
 import torch
 import torch.nn as nn
 
-class MergeTemporalDim(nn.Module):
+class MergeTemporalDim(Module):
     def __init__(self, T):
         super().__init__()
         self.T = T
@@ -11,7 +12,7 @@ class MergeTemporalDim(nn.Module):
     def forward(self, x_seq: torch.Tensor):
         return x_seq.flatten(0, 1).contiguous()
 
-class ExpandTemporalDim(nn.Module):
+class ExpandTemporalDim(Module):
     def __init__(self, T):
         super().__init__()
         self.T = T
@@ -53,7 +54,7 @@ myfloor = GradFloor.apply
 
 
 
-class IF(nn.Module):
+class IF(Module):
     def __init__(self, T=0, L=8, thresh=8.0, tau=1., gama=1.0):
         super(IF, self).__init__()
         self.act = ZIF.apply
