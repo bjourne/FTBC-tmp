@@ -1,32 +1,38 @@
 from textwrap import fill
 from torchvision import datasets, transforms
+from torchvision.transforms import *
 from torch.utils.data import DataLoader
+from Preprocess.augment import Cutout, CIFAR10Policy
+from torch.utils.data import Dataset
+
 import torch
 import os
-from Preprocess.augment import Cutout, CIFAR10Policy
-from datasets import load_dataset
-from torch.utils.data import Dataset
+
 
 # your own data dir
 DIR = {'CIFAR10': '~/datasets', 'CIFAR100': '~/datasets', 'ImageNet': 'YOUR_IMAGENET_DIR'}
 
 def GetCifar10(batchsize, attack=False):
-    trans_t = transforms.Compose([transforms.RandomCrop(32, padding=4),
-                                  transforms.RandomHorizontalFlip(),
-                                  CIFAR10Policy(),
-                                  transforms.ToTensor(),
-                                  transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-                                  Cutout(n_holes=1, length=16)
-                                  ])
+    trans_t = Compose([
+        RandomCrop(32, padding=4),
+        RandomHorizontalFlip(),
+        CIFAR10Policy(),
+        ToTensor(),
+        Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        Cutout(n_holes=1, length=16)
+    ])
     if attack:
-        trans = transforms.Compose([transforms.ToTensor()])
+        trans = Compose([ToTensor()])
     else:
-        trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+        trans = Compose([
+            ToTensor(),
+            Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+        ])
     train_data = datasets.CIFAR10(DIR['CIFAR10'], train=True, transform=trans_t, download=True)
     test_data = datasets.CIFAR10(DIR['CIFAR10'], train=False, transform=trans, download=True)
-    train_dataloader = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=8)
-    test_dataloader = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=8)
-    return train_dataloader, test_dataloader
+    l_tr = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=8)
+    l_te = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=8)
+    return l_tr, l_te
 
 def GetCifar100(batchsize):
     trans_t = transforms.Compose([transforms.RandomCrop(32, padding=4),
@@ -39,9 +45,9 @@ def GetCifar100(batchsize):
     trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[n/255. for n in [129.3, 124.1, 112.4]], std=[n/255. for n in [68.2,  65.4,  70.4]])])
     train_data = datasets.CIFAR100(DIR['CIFAR100'], train=True, transform=trans_t, download=True)
     test_data = datasets.CIFAR100(DIR['CIFAR100'], train=False, transform=trans, download=True)
-    train_dataloader = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=8, pin_memory=True)
-    test_dataloader = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=4, pin_memory=True)
-    return train_dataloader, test_dataloader
+    l_tr = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=8, pin_memory=True)
+    l_te = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=4, pin_memory=True)
+    return l_tr, l_te
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
@@ -61,9 +67,6 @@ class TransformedDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         return image, item['label']
-
-
-
 
 def GetImageNet(
         input_size: int = 224,

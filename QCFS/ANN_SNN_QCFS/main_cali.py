@@ -10,9 +10,12 @@ import warnings
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim
+
+from argparse import ArgumentParser
 from Models import modelpool
 from Preprocess import datapool
 from utils import train, val, seed_all, get_logger
+from os.path import join
 from Models.layer import *
 
 
@@ -89,33 +92,41 @@ def bias_corr_step_by_step(
         v_t_1 = v_t_updated
 
 
-def bias_corr_model(ann, snn, T, train_loader: torch.utils.data.DataLoader, curr_t_alpha=0.5, num_cali_sample_batches=2):
+def bias_corr_model(
+        ann, snn,
+        T, l_tr,
+        curr_t_alpha=0.5,
+        num_cali_sample_batches=2
+):
     print(f"==> Start Bias Correction...")
     device = next(ann.parameters()).device
 
     ann.eval()
     snn.eval()
 
-    for i, (inputs, target) in enumerate(train_loader):
+    ann_mods = ann.named_modules()
+    snn_mods = snn.named_modules()
+
+    for i, (xs, ys) in enumerate(l_tr):
         print(f"calibration using batch_idx: {i}")
 
         if i >= num_cali_sample_batches:
             break
 
         sys.stdout.flush()
-        inputs = inputs.to(device=device)
-        for (name_ann, module_ann), (name_snn, module_snn) in zip(ann.named_modules(), snn.named_modules()):
+        xs = xs.to(device=device)
+        for (name_ann, module_ann), (name_snn, module_snn) in zip(ann_mods, snn_mods):
             assert name_ann == name_snn
             if isinstance(module_snn, IF):
                 #--------------------------------------------------------------------------------------------#
                 ### our method: time-based bias cali: go to class IF in qcfs_models/layer.py
                 bias_corr_step_by_step(
-                    ann, module_ann, snn, module_snn, T, inputs, curr_t_alpha=curr_t_alpha)
+                    ann, module_ann, snn, module_snn, T, xs, curr_t_alpha=curr_t_alpha)
                 #--------------------------------------------------------------------------------------------#
 
 
 def main():
-    parser = argparse.ArgumentParser(description='PyTorch Training')
+    parser = ArgumentParser(description='PyTorch Training')
     # just use default setting
     parser.add_argument('-j','--workers',default=16, type=int,metavar='N',help='number of data loading workers')
     parser.add_argument('-b','--batch_size',default=200, type=int,metavar='N',help='mini-batch size')
@@ -140,13 +151,13 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # preparing data
-    train_loader, test_loader = datapool(args.dataset, args.batch_size, dist_sample=False)
+    l_tr, test_loader = datapool(args.dataset, args.batch_size, dist_sample=False)
 
     # preparing model
     model = modelpool(args.model, args.dataset)
 
     model_dir = '%s-checkpoints'% (args.dataset)
-    state_dict = torch.load(os.path.join(model_dir, args.identifier + '.pth'), map_location=torch.device('cpu'))
+    state_dict = torch.load(join(model_dir, args.identifier + '.pth'), map_location=torch.device('cpu'))
 
     keys = list(state_dict.keys())
     for k in keys:
@@ -159,9 +170,6 @@ def main():
     model.to(device)
 
     ann = copy.deepcopy(model)
-
-    # acc = val(model=ann, test_loader=test_loader, T=0, device=device) # , sample_iter=10
-    # print(f"ANN accuracy: {acc}")
 
     #--------------------------------------------------------------------------#
     ### SNN version in QCFS
@@ -184,7 +192,7 @@ def main():
         ann=ann, # ann
         snn=model, # snn
         T=args.time,
-        train_loader=train_loader,
+        l_tr=l_tr,
         curr_t_alpha=0.4,
         num_cali_sample_batches=3,
     )

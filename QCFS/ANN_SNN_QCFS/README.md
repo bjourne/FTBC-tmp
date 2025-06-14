@@ -1,7 +1,7 @@
-# NOTE: The README is adapted from the original repository.
-
 # ANN_SNN_QCFS
-Code for paper "Optimal ANN-SNN conversion for high-accuracy and ultra-low-latency spiking neural networks"
+
+Code for paper "Optimal ANN-SNN conversion for high-accuracy and
+ultra-low-latency spiking neural networks"
 
 Reproducable and fix random seed.
 Use shared weight for ANN and SNN, easy to load and use.
